@@ -35,6 +35,7 @@ usage of this module might look like this:
 
 import cgi
 import hashlib
+import re
 import time
 import urllib
 
@@ -48,6 +49,8 @@ except ImportError:
         import json
 _parse_json = json.loads
 
+p = "^\(#(\d+)\)"
+code_re = re.compile(p)
 
 class GraphAPI(object):
     """A client for the Facebook Graph API.
@@ -120,7 +123,7 @@ class GraphAPI(object):
         extended permissions.
         """
         assert self.access_token, "Write operations require an access token"
-        self.request(parent_object + "/" + connection_name, post_args=data)
+        return self.request(parent_object + "/" + connection_name, post_args=data)
 
     def put_wall_post(self, message, attachment={}, profile_id="me"):
         """Writes a wall post to the given profile's wall.
@@ -138,19 +141,19 @@ class GraphAPI(object):
              "picture": "http://www.example.com/thumbnail.jpg"}
 
         """
-        self.put_object(profile_id, "feed", message=message, **attachment)
+        return self.put_object(profile_id, "feed", message=message, **attachment)
 
     def put_comment(self, object_id, message):
         """Writes the given comment on the given post."""
-        self.put_object(object_id, "comments", message=message)
+        return self.put_object(object_id, "comments", message=message)
 
     def put_like(self, object_id):
         """Likes the given post."""
-        self.put_object(object_id, "likes")
+        return self.put_object(object_id, "likes")
 
     def delete_object(self, id):
         """Deletes the object with the given ID from the graph."""
-        self.request(id, post_args={"method": "delete"})
+        return self.request(id, post_args={"method": "delete"})
 
     def put_photo(self, album_id, message, photo):
         """Puts a photo into an album"""
@@ -169,17 +172,27 @@ class GraphAPI(object):
             else:
                 args["access_token"] = self.access_token
         post_data = None if post_args is None else urllib.urlencode(post_args)
-        file = urllib.urlopen("https://graph.facebook.com/" + path + "?" +
-                              urllib.urlencode(args), post_data)
+        url = "https://graph.facebook.com/%s" % path
+        if len(args)>0:
+            url = "%s?%s" % (url, urllib.urlencode(args))
+        file = urllib.urlopen(url, post_data)
         try:
             data = file.read()
         finally:
             file.close()
         try:
             response = _parse_json(data)
-            if response.get("error"):
-                raise GraphAPIError(response["error"].get("code", 1),
-                                    response["error"]["message"])
+            if type(response) == dict:
+                if response.get("error"):
+                    code = response["error"].get("code")
+                    msg = response["error"]["message"]
+                    if code is None:
+                        try:
+                            code = code_re.match(msg).group(1)
+                        except AttributeError:
+                            pass
+                    raise GraphAPIError(code, msg)
+            
         except ValueError:
             response = data
             
