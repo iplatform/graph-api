@@ -180,23 +180,8 @@ class GraphAPI(object):
             data = file.read()
         finally:
             file.close()
-        try:
-            response = _parse_json(data)
-            if type(response) == dict:
-                if response.get("error"):
-                    code = response["error"].get("code")
-                    msg = response["error"]["message"]
-                    if code is None:
-                        try:
-                            code = code_re.match(msg).group(1)
-                        except AttributeError:
-                            pass
-                    raise GraphAPIError(code, msg)
             
-        except ValueError:
-            response = data
-            
-        return response
+        return self._parse_response(data)
 
     def mime_request(self, path, *args, **kwargs):
         
@@ -247,7 +232,25 @@ class GraphAPI(object):
         
         r.request('POST', '/%s' % path, body, headers)
                         
-        return self._process_response(r.getresponse())        
+        return self._parse_response(r.getresponse())        
+
+    def _parse_response(self, data):
+        try:
+            response = _parse_json(data)
+            if type(response) == dict:
+                if response.get("error"):
+                    code = response["error"].get("code")
+                    msg = response["error"]["message"]
+                    if code is None:
+                        try:
+                            code = int(code_re.match(msg).group(1))
+                        except AttributeError:
+                            pass
+                    raise GraphAPIError(code, msg)
+            
+        except ValueError:
+            response = data
+        return response        
 
 class GraphAPIError(Exception):
     def __init__(self, code, message):
