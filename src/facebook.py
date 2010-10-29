@@ -145,6 +145,9 @@ class GraphAPI(object):
         """
         return self.put_object(profile_id, "feed", message=message, **attachment)
 
+    def put_link(self, link, profile_id="me", **kwargs):
+        return self.put_object(profile_id, "links", link=link, **kwargs)
+
     def put_comment(self, object_id, message):
         """Writes the given comment on the given post."""
         return self.put_object(object_id, "comments", message=message)
