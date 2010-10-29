@@ -152,6 +152,10 @@ class GraphAPI(object):
         """Deletes the object with the given ID from the graph."""
         self.request(id, post_args={"method": "delete"})
 
+    def put_photo(self, album_id, message, photo):
+        """Puts a photo into an album"""
+        return self.mime_request("%s/photos" % album_id, message=message, file=photo)
+
     def request(self, path, args=None, post_args=None):
         """Fetches the given path in the Graph API.
 
@@ -181,6 +185,59 @@ class GraphAPI(object):
             
         return response
 
+    def mime_request(self, path, *args, **kwargs):
+        
+        body = []
+        crlf = '\r\n'
+        boundary = "graphBoundary"
+        
+        # UTF8
+        utf8_kwargs = {}
+        for (k,v) in kwargs.iteritems():
+            try:
+                v = v.encode('UTF-8')
+            except AttributeError: pass
+            utf8_kwargs[k] = v
+        
+        # Add args
+        utf8_kwargs.update({'access_token': self.access_token})
+        for (k,v) in utf8_kwargs.iteritems():
+            if k=='file': continue
+            body.append("--"+boundary)
+            body.append('Content-Disposition: form-data; name="%s"' % k) 
+            body.append('')
+            body.append(str(v))
+        
+        # Add raw data
+        file= utf8_kwargs.get('file')
+        if data:
+            file.open()
+            data = file.read()
+            file.close()
+            
+            body.append("--"+boundary)
+            body.append('Content-Disposition: form-data; filename="myfilewhichisgood.png"')
+            body.append('Content-Type: image/png')
+            body.append('')
+            body.append(data)
+            
+            body.append("--"+boundary+"--")
+            body.append('')
+        
+        body = crlf.join(body)
+                
+        # Post to server
+        r = httplib.HTTPSConnection('graph.facebook.com')
+        headers = {'Content-Type': 'multipart/form-data; boundary=%s' % boundary,
+                   'Content-Length': str(len(body)),
+                   'MIME-Version': '1.0'}
+        
+        print header
+        print body
+        
+        r.request('POST', '/%s' % path, body, headers)
+                        
+        return self._process_response(r.getresponse())        
 
 class GraphAPIError(Exception):
     def __init__(self, code, message):
