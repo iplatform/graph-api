@@ -232,9 +232,6 @@ class GraphAPI(object):
                    'Content-Length': str(len(body)),
                    'MIME-Version': '1.0'}
         
-        print header
-        print body
-        
         r.request('POST', '/%s' % path, body, headers)
                         
         return self._process_response(r.getresponse())        
