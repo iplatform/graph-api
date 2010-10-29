@@ -35,6 +35,7 @@ usage of this module might look like this:
 
 import cgi
 import hashlib
+import httplib
 import re
 import time
 import urllib
@@ -48,6 +49,7 @@ except ImportError:
     except ImportError:
         import json
 _parse_json = json.loads
+_parse_json_stream = json.load
 
 p = "^\(#(\d+)\)"
 code_re = re.compile(p)
@@ -172,9 +174,7 @@ class GraphAPI(object):
             else:
                 args["access_token"] = self.access_token
         post_data = None if post_args is None else urllib.urlencode(post_args)
-        url = "https://graph.facebook.com/%s" % path
-        if len(args)>0:
-            url = "%s?%s" % (url, urllib.urlencode(args))
+        url = "https://graph.facebook.com/%s?%s" % (path, urllib.urlencode(args))
         file = urllib.urlopen(url, post_data)
         try:
             data = file.read()
@@ -207,8 +207,8 @@ class GraphAPI(object):
             body.append(str(v))
         
         # Add raw data
-        file= utf8_kwargs.get('file')
-        if data:
+        file = utf8_kwargs.get('file')
+        if file:
             file.open()
             data = file.read()
             file.close()
@@ -223,7 +223,7 @@ class GraphAPI(object):
             body.append('')
         
         body = crlf.join(body)
-                
+        
         # Post to server
         r = httplib.HTTPSConnection('graph.facebook.com')
         headers = {'Content-Type': 'multipart/form-data; boundary=%s' % boundary,
@@ -232,11 +232,12 @@ class GraphAPI(object):
         
         r.request('POST', '/%s' % path, body, headers)
                         
-        return self._parse_response(r.getresponse())        
+        return self._parse_response(r.getresponse(), parse_method=_parse_json_stream)        
 
-    def _parse_response(self, data):
+    def _parse_response(self, data, parse_method=_parse_json):
         try:
-            response = _parse_json(data)
+            response = parse_method(data)
+            
             if type(response) == dict:
                 if response.get("error"):
                     code = response["error"].get("code")
